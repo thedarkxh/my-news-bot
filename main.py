@@ -1,46 +1,42 @@
 import os
+import time
 import requests
+import asyncio
 import google.generativeai as genai
 from telegram import Bot
-from fastapi import FastAPI
-import asyncio
 
-app = FastAPI()
-
-# Cloud Environment Variables
+# Get secrets from Hugging Face environment
 TG_TOKEN = os.getenv("TG_TOKEN")
 CH_ID = os.getenv("CH_ID")
 NEWS_KEY = os.getenv("NEWS_KEY")
 GEMINI_KEY = os.getenv("GEMINI_KEY")
 
 genai.configure(api_key=GEMINI_KEY)
-gemini_model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-1.5-flash')
 
-async def fetch_and_post():
-    # 1. Fetch News (Mainstream Indian Sources)
-    domains = "thehindu.com,ndtv.com,timesofindia.indiatimes.com"
-    url = f"https://newsapi.org/v2/everything?domains={domains}&pageSize=1&apiKey={NEWS_KEY}"
-    data = requests.get(url).json()
-    
-    if not data.get('articles'): return "No news found"
-    article = data['articles'][0]
-
-    # 2. AI Summary
-    prompt = f"Summarize this Indian news for a Telegram channel. Use emojis and keep it under 3 bullets: {article['title']} - {article['description']}"
-    summary = gemini_model.generate_content(prompt).text
-
-    # 3. Post to Telegram
+async def send_news():
     bot = Bot(token=TG_TOKEN)
-    caption = f"🇮🇳 **{article['title']}**\n\n{summary}\n\n🔗 [Source]({article['url']})"
-    
-    if article.get('urlToImage'):
-        await bot.send_photo(chat_id=CH_ID, photo=article['urlToImage'], caption=caption, parse_mode='Markdown')
-    else:
-        await bot.send_message(chat_id=CH_ID, text=caption, parse_mode='Markdown')
-    return "Posted successfully"
+    while True:
+        try:
+            # 1. Fetch News
+            url = f"https://newsapi.org/v2/top-headlines?country=in&pageSize=1&apiKey={NEWS_KEY}"
+            data = requests.get(url).json()
+            article = data['articles'][0]
 
-@app.get("/")
-async def trigger_bot():
-    # This endpoint is what Cron-job.org will hit
-    status = await fetch_and_post()
-    return {"status": status}
+            # 2. AI Summary
+            prompt = f"Summarize this Indian news for Telegram: {article['title']}. Use emojis."
+            summary = model.generate_content(prompt).text
+
+            # 3. Post
+            caption = f"🇮🇳 **{article['title']}**\n\n{summary}\n\n🔗 [Read More]({article['url']})"
+            await bot.send_photo(chat_id=CH_ID, photo=article['urlToImage'], caption=caption, parse_mode='Markdown')
+            
+            print("News posted! Sleeping for 3 hours...")
+            await asyncio.sleep(10800) # Wait 3 hours
+            
+        except Exception as e:
+            print(f"Error: {e}")
+            await asyncio.sleep(60) # Retry in a minute if it fails
+
+if __name__ == "__main__":
+    asyncio.run(send_news())
