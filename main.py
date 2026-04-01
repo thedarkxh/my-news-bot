@@ -2,41 +2,45 @@ import os
 import requests
 import google.generativeai as genai
 from telegram import Bot
+from fastapi import FastAPI
 import asyncio
 
-# These will be stored in your Cloud Environment Variables (Safe!)
+app = FastAPI()
+
+# Cloud Environment Variables
 TG_TOKEN = os.getenv("TG_TOKEN")
 CH_ID = os.getenv("CH_ID")
 NEWS_KEY = os.getenv("NEWS_KEY")
 GEMINI_KEY = os.getenv("GEMINI_KEY")
-IMAGE_API_KEY = os.getenv("IMAGE_API_KEY")
 
 genai.configure(api_key=GEMINI_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
+gemini_model = genai.GenerativeModel('gemini-1.5-flash')
 
-async def run_bot():
-    # 1. Get Indian News
+async def fetch_and_post():
+    # 1. Fetch News (Mainstream Indian Sources)
     domains = "thehindu.com,ndtv.com,timesofindia.indiatimes.com"
     url = f"https://newsapi.org/v2/everything?domains={domains}&pageSize=1&apiKey={NEWS_KEY}"
     data = requests.get(url).json()
+    
+    if not data.get('articles'): return "No news found"
     article = data['articles'][0]
 
     # 2. AI Summary
-    prompt = f"Summarize this Indian news for Telegram with emojis: {article['title']} - {article['description']}"
-    summary = model.generate_content(prompt).text
+    prompt = f"Summarize this Indian news for a Telegram channel. Use emojis and keep it under 3 bullets: {article['title']} - {article['description']}"
+    summary = gemini_model.generate_content(prompt).text
 
-    # 3. Generate NEW AI Image (Flux Schnell)
-    # This makes your bot unique!
-    img_resp = requests.post(
-        "https://api.pixazo.ai/v1/generate",
-        headers={"Authorization": f"Bearer {IMAGE_API_KEY}"},
-        json={"prompt": f"Professional news illustration for: {article['title']}", "model": "flux-schnell"}
-    ).json()
-    ai_img_url = img_resp.get('url')
-
-    # 4. Post
+    # 3. Post to Telegram
     bot = Bot(token=TG_TOKEN)
-    await bot.send_photo(chat_id=CH_ID, photo=ai_img_url, caption=f"🇮🇳 **{article['title']}**\n\n{summary}\n\n🔗 [Read More]({article['url']})", parse_mode='Markdown')
+    caption = f"🇮🇳 **{article['title']}**\n\n{summary}\n\n🔗 [Source]({article['url']})"
+    
+    if article.get('urlToImage'):
+        await bot.send_photo(chat_id=CH_ID, photo=article['urlToImage'], caption=caption, parse_mode='Markdown')
+    else:
+        await bot.send_message(chat_id=CH_ID, text=caption, parse_mode='Markdown')
+    return "Posted successfully"
 
-if __name__ == "__main__":
-    asyncio.run(run_bot())
+@app.get("/")
+async def trigger_bot():
+    # This endpoint is what Cron-job.org will hit
+    status = await fetch_and_post()
+    return {"status": status}
