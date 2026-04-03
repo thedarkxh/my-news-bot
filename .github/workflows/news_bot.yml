@@ -1,0 +1,30 @@
+name: News Bot Cron
+
+on:
+  schedule:
+    - cron: '*/30 * * * *' # Runs every 30 minutes
+  workflow_dispatch:      # Allows you to run it manually with a button
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: |
+          pip install aiohttp beautifulsoup4 python-telegram-bot google-api-python-client google-auth-httplib2 google-auth-oauthlib
+
+      - name: Run Bot
+        env:
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          CH_ID: ${{ secrets.CH_ID }}
+          LINKVERTISE_ID: ${{ secrets.LINKVERTISE_ID }}
+          GDRIVE_JSON: ${{ secrets.GDRIVE_JSON }}
+        run: python app.py
