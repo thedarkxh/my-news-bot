@@ -20,13 +20,16 @@ LINKVERTISE_ID = os.getenv("LINKVERTISE_ID")
 GDRIVE_JSON = os.getenv("GDRIVE_JSON")
 FILE_NAME = "posted_news.txt"
 
-# Linked Post Configuration
+# PASTE YOUR FOLDER ID HERE FROM DRIVE URL
+FOLDER_ID = "1msm9na2P31QXYNjA3JNnuPeUW2TD90Oh" 
+
+# Linked Post Config
 SECONDARY_LINK = "https://t.me/tedsxh" 
 SECONDARY_NAME = "Join Teds Mordare Official"
 
 posted_urls = deque(maxlen=5000)
 
-# --- 45+ ELITE & TRUSTED SOURCES ---
+# --- TARGET SOURCES ---
 SCRAPE_TARGETS = [
     {"url": "https://www.reuters.com/world/", "tag": "h3", "name": "Reuters"},
     {"url": "https://apnews.com/hub/world-news", "tag": "h3", "name": "Associated Press"},
@@ -35,24 +38,17 @@ SCRAPE_TARGETS = [
     {"url": "https://www.dw.com/en/world/s-1429", "tag": "h2", "name": "DW News"},
     {"url": "https://www.aljazeera.com/news/", "tag": "h3", "name": "Al Jazeera"},
     {"url": "https://www.nytimes.com/section/world", "tag": "h2", "name": "NY Times"},
-    {"url": "https://www.washingtonpost.com/world/", "tag": "h2", "name": "Washington Post"},
     {"url": "https://www.thehindu.com/news/national/", "tag": "h3", "name": "The Hindu"},
     {"url": "https://www.ndtv.com/india", "tag": "h2", "name": "NDTV"},
-    {"url": "https://indianexpress.com/section/india/", "tag": "h2", "name": "Indian Express"},
     {"url": "https://techcrunch.com/", "tag": "h2", "name": "TechCrunch"},
     {"url": "https://www.theverge.com/", "tag": "h2", "name": "The Verge"},
     {"url": "https://arstechnica.com/", "tag": "h2", "name": "Ars Technica"},
     {"url": "https://hackaday.com/", "tag": "h2", "name": "Hackaday"},
     {"url": "https://www.japantimes.co.jp/news/national/", "tag": "h2", "name": "Japan Times"},
-    {"url": "https://www.scmp.com/news/asia", "tag": "h2", "name": "SCMP"},
-    {"url": "https://www.theguardian.com/world", "tag": "h3", "name": "The Guardian"},
-    {"url": "https://www.economist.com/latest/", "tag": "h3", "name": "The Economist"},
-    {"url": "https://www.wsj.com/news/world", "tag": "h3", "name": "WSJ"},
-    {"url": "https://www.ft.com/world", "tag": "h3", "name": "Financial Times"}
-    # Note: You can expand this list up to 45+ as long as you follow the {"url", "tag", "name"} format.
+    {"url": "https://www.theguardian.com/world", "tag": "h3", "name": "The Guardian"}
 ]
 
-# --- GOOGLE DRIVE PERSISTENCE ---
+# --- GOOGLE DRIVE SYNC (FIXED) ---
 def get_gdrive():
     creds = Credentials.from_service_account_info(json.loads(GDRIVE_JSON))
     return build('drive', 'v3', credentials=creds)
@@ -60,43 +56,52 @@ def get_gdrive():
 def sync_drive():
     try:
         service = get_gdrive()
-        res = service.files().list(q=f"name='{FILE_NAME}'", fields="files(id)").execute()
+        # Ensure we look ONLY in the specific folder for the txt file
+        query = f"name='{FILE_NAME}' and '{FOLDER_ID}' in parents"
+        res = service.files().list(q=query, fields="files(id)").execute()
         files = res.get('files', [])
+        
         if not files:
-            meta = {'name': FILE_NAME, 'mimeType': 'text/plain'}
+            print("📁 File not found in folder. Creating fresh...")
+            meta = {'name': FILE_NAME, 'parents': [FOLDER_ID]}
             media = MediaFileUpload(io.BytesIO(b""), mimetype='text/plain')
             f = service.files().create(body=meta, media_body=media, fields='id').execute()
             return f['id'], []
+            
         fid = files[0]['id']
         req = service.files().get_media(fileId=fid)
         fh = io.BytesIO()
         downloader = MediaIoBaseDownload(fh, req)
         done = False
         while not done: _, done = downloader.next_chunk()
-        return fid, fh.getvalue().decode().splitlines()
+        
+        history = fh.getvalue().decode().splitlines()
+        print(f"✅ Sync Success: {len(history)} URLs loaded from Drive.")
+        return fid, history
     except Exception as e:
-        print(f"Drive Sync Error: {e}")
+        print(f"❌ Drive Sync Error: {e}")
         return None, []
 
 def update_drive(fid, urls):
     try:
         service = get_gdrive()
-        media = MediaFileUpload(io.BytesIO("\n".join(urls).encode()), mimetype='text/plain')
+        content = "\n".join(urls)
+        media = MediaFileUpload(io.BytesIO(content.encode()), mimetype='text/plain')
         service.files().update(fileId=fid, media_body=media).execute()
-    except: pass
+        print("💾 Drive History Updated.")
+    except Exception as e:
+        print(f"❌ Drive Update Failed: {e}")
 
-# --- MONETIZATION & SCRAPING ---
+# --- CORE LOGIC ---
 def monetize(url):
     b64 = base64.b64encode(url.encode()).decode()
-    # Random float in dynamic URL prevents Linkvertise duplicate link detection
     return f"https://link-to.net/{LINKVERTISE_ID}/{random.random()}/dynamic?r={b64}"
 
 async def scrape(session, target):
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    ua = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
     try:
-        async with session.get(target["url"], timeout=15, headers=headers) as r:
+        async with session.get(target["url"], timeout=15, headers=ua) as r:
             soup = BeautifulSoup(await r.text(), 'html.parser')
-            # Look at top 10 headlines per source
             headlines = soup.find_all(target["tag"], limit=10)
             random.shuffle(headlines)
             for h in headlines:
@@ -108,11 +113,10 @@ async def scrape(session, target):
                 if not link.startswith('http'):
                     link = f"https://{target['url'].split('/')[2]}/{link.lstrip('/')}"
                 
-                # Check against history
                 if link not in posted_urls and len(title) > 40:
                     img = None
                     try:
-                        async with session.get(link, timeout=7, headers=headers) as ar:
+                        async with session.get(link, timeout=7, headers=ua) as ar:
                             asoup = BeautifulSoup(await ar.text(), 'html.parser')
                             m = asoup.find("meta", property="og:image") or asoup.find("meta", attrs={"name": "twitter:image"})
                             if m: img = m.get('content')
@@ -120,27 +124,32 @@ async def scrape(session, target):
                     return {"title": title, "url": link, "source": target['name'], "image": img}
     except: return None
 
-# --- MAIN WORKER ---
 async def main():
-    print("⏳ Starting Aggressive Pulse Cycle...")
+    print("🚀 Triggering Pulse Run...")
     fid, history = sync_drive()
     posted_urls.extend(history)
     
     bot = Bot(token=TG_TOKEN)
-    # limit=10 allows faster concurrent scraping
     async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(limit=10)) as session:
-        # Check EVERY target in the list to catch all news
+        # Check all sources to ensure maximum coverage
         tasks = [scrape(session, s) for s in SCRAPE_TARGETS]
         results = await asyncio.gather(*tasks)
         
         fresh_articles = [r for r in results if r]
         
         if fresh_articles:
-            print(f"📰 Found {len(fresh_articles)} fresh updates!")
+            # deduplicate batch
+            seen_this_run = set()
+            unique_articles = []
             for art in fresh_articles:
+                if art['url'] not in seen_this_run:
+                    unique_articles.append(art)
+                    seen_this_run.add(art['url'])
+
+            print(f"📰 Posting {len(unique_articles)} new stories.")
+            for art in unique_articles:
                 short_link = monetize(art['url'])
                 
-                # Formatted Message with Linked Post (CTA)
                 msg = (
                     f"🚨 **BREAKING NEWS**\n\n"
                     f"📰 **{art['title'].upper()}**\n\n"
@@ -153,20 +162,17 @@ async def main():
                     if art['image']:
                         await bot.send_photo(CH_ID, art['image'], caption=msg[:1024], parse_mode=ParseMode.MARKDOWN)
                     else:
-                        await bot.send_message(CH_ID, text=msg, parse_mode=ParseMode.MARKDOWN)
+                        await bot.send_message(CH_ID, msg, parse_mode=ParseMode.MARKDOWN)
                     
-                    # Update local memory
                     posted_urls.append(art['url'])
-                    print(f"✅ Posted: {art['source']}")
-                    # 3s delay to respect Telegram rate limits
-                    await asyncio.sleep(3) 
+                    print(f"✅ Success: {art['source']}")
+                    await asyncio.sleep(4) 
                 except Exception as e:
-                    print(f"Telegram Error: {e}")
+                    print(f"❌ Telegram Error: {e}")
             
-            # Final history sync to Drive
             update_drive(fid, list(posted_urls))
         else:
-            print("💤 No new news found in this cycle.")
+            print("💤 No new articles found.")
 
 if __name__ == "__main__":
     asyncio.run(main())
