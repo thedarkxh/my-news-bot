@@ -10,7 +10,7 @@ from telegram import Bot
 from telegram.constants import ParseMode
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload, MediaIoBaseUpload
+from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 
 # --- CONFIG & SECRETS ---
 TG_TOKEN = os.getenv("TG_TOKEN")
@@ -18,11 +18,15 @@ CH_ID = os.getenv("CH_ID")
 LINKVERTISE_ID = os.getenv("LINKVERTISE_ID")
 GDRIVE_JSON = os.getenv("GDRIVE_JSON")
 FILE_NAME = "posted_news.txt"
+
+# Your specific folder ID from Drive
 FOLDER_ID = "1msm9na2P31QXYNjA3JNnuPeUW2TD90Oh" 
 
+# CTA for your Telegram channel
 SECONDARY_LINK = "https://t.me/tedsxh" 
 SECONDARY_NAME = "Join Teds Mordare Official"
 
+# --- GOOGLE DRIVE CORE ---
 def get_gdrive():
     creds = Credentials.from_service_account_info(json.loads(GDRIVE_JSON))
     return build('drive', 'v3', credentials=creds)
@@ -30,12 +34,13 @@ def get_gdrive():
 def sync_drive():
     try:
         service = get_gdrive()
+        # Search for the tracking file to prevent duplicates
         query = f"name='{FILE_NAME}' and trashed = false"
         res = service.files().list(q=query, fields="files(id, name)").execute()
         files = res.get('files', [])
         
         if not files:
-            print("⚠️ File not found. Creating a new one...")
+            print("📁 File not found. Creating a NEW tracking file...")
             meta = {'name': FILE_NAME, 'parents': [FOLDER_ID]}
             media = MediaIoBaseUpload(io.BytesIO(b""), mimetype='text/plain', resumable=True)
             f = service.files().create(body=meta, media_body=media, fields='id').execute()
@@ -51,6 +56,7 @@ def sync_drive():
         while not done:
             _, done = downloader.next_chunk()
         
+        # Load existing URLs into memory
         history = fh.getvalue().decode('utf-8').splitlines()
         history = [line.strip() for line in history if line.strip()]
         print(f"📦 Loaded {len(history)} previous URLs.")
@@ -63,13 +69,13 @@ def update_drive(fid, urls):
     if not fid: return
     try:
         service = get_gdrive()
-        # Ensure only unique URLs, keep last 1000 for efficiency
+        # Keep only the last 1000 unique URLs to maintain speed
         content = "\n".join(list(dict.fromkeys(urls))[-1000:])
         
-        # Use MediaIoBaseUpload instead of MediaFileUpload to fix the BytesIO error
+        # Fixed: Uses MediaIoBaseUpload to avoid PathLike error
         media = MediaIoBaseUpload(io.BytesIO(content.encode('utf-8')), mimetype='text/plain', resumable=True)
         service.files().update(fileId=fid, media_body=media).execute()
-        print("💾 History saved to Drive.")
+        print("💾 History successfully saved to Drive.")
     except Exception as e:
         print(f"❌ UPDATE ERROR: {e}")
 
@@ -83,6 +89,7 @@ async def scrape(session, target, history_set):
     try:
         async with session.get(target["url"], timeout=15, headers=headers) as r:
             soup = BeautifulSoup(await r.text(), 'html.parser')
+            # Scrape up to 12 potential headlines per source
             headlines = soup.find_all(target["tag"], limit=12)
             for h in headlines:
                 link_tag = h.find_parent('a') or h.find('a')
@@ -92,6 +99,7 @@ async def scrape(session, target, history_set):
                 if not link.startswith('http'):
                     link = f"https://{target['url'].split('/')[2]}/{link.lstrip('/')}"
                 
+                # THE DUPLICATE CHECK: Skip if already in Drive history
                 if link in history_set: continue
                 
                 title = h.get_text().strip()
@@ -108,9 +116,11 @@ async def scrape(session, target, history_set):
                 return {"title": title, "url": link, "source": target['name'], "image": img}
     except: return None
 
+# --- MAIN ENGINE ---
 async def main():
+    # 1. Start by loading the Drive file to avoid repeats
     fid, history = sync_drive()
-    history_set = set(history)
+    history_set = set(history) # Faster lookup for large lists
     
     SCRAPE_TARGETS = [
         {"url": "https://www.reuters.com/world/", "tag": "h3", "name": "Reuters"},
@@ -118,20 +128,24 @@ async def main():
         {"url": "https://www.bloomberg.com/world", "tag": "h2", "name": "Bloomberg"},
         {"url": "https://www.bbc.com/news/world", "tag": "h2", "name": "BBC News"},
         {"url": "https://www.dw.com/en/world/s-1429", "tag": "h2", "name": "DW News"},
+        {"url": "https://www.aljazeera.com/news/", "tag": "h3", "name": "Al Jazeera"},
         {"url": "https://www.thehindu.com/news/national/", "tag": "h3", "name": "The Hindu"},
-        {"url": "https://www.ndtv.com/india", "tag": "h2", "name": "NDTV"}
+        {"url": "https://www.ndtv.com/india", "tag": "h2", "name": "NDTV"},
+        {"url": "https://techcrunch.com/", "tag": "h2", "name": "TechCrunch"}
     ]
 
     bot = Bot(token=TG_TOKEN)
     async with aiohttp.ClientSession() as session:
+        # Run all scraping tasks concurrently
         results = await asyncio.gather(*[scrape(session, t, history_set) for t in SCRAPE_TARGETS])
         fresh = [r for r in results if r]
         
         if not fresh:
-            print("💤 No new content.")
+            print("💤 All news is currently up to date.")
             return
 
         for art in fresh:
+            # Final safety check before posting to Telegram
             if art['url'] in history_set: continue
             
             msg = (
@@ -148,13 +162,15 @@ async def main():
                 else:
                     await bot.send_message(CH_ID, msg, parse_mode=ParseMode.MARKDOWN)
                 
+                # Update local history so we don't post it again in the next run
                 history.append(art['url'])
                 history_set.add(art['url'])
                 print(f"✅ Posted: {art['source']}")
-                await asyncio.sleep(3) 
+                await asyncio.sleep(3) # Anti-spam delay
             except Exception as e:
                 print(f"❌ Telegram Error: {e}")
         
+        # 2. Save the new history back to Drive
         update_drive(fid, history)
 
 if __name__ == "__main__":
