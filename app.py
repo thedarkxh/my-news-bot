@@ -10,7 +10,7 @@ from telegram import Bot
 from telegram.constants import ParseMode
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
+from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload, MediaIoBaseUpload
 
 # --- CONFIG & SECRETS ---
 TG_TOKEN = os.getenv("TG_TOKEN")
@@ -18,15 +18,11 @@ CH_ID = os.getenv("CH_ID")
 LINKVERTISE_ID = os.getenv("LINKVERTISE_ID")
 GDRIVE_JSON = os.getenv("GDRIVE_JSON")
 FILE_NAME = "posted_news.txt"
-
-# Your Folder ID from the URL
 FOLDER_ID = "1msm9na2P31QXYNjA3JNnuPeUW2TD90Oh" 
 
-# Linked Post CTA
 SECONDARY_LINK = "https://t.me/tedsxh" 
 SECONDARY_NAME = "Join Teds Mordare Official"
 
-# --- GOOGLE DRIVE ENGINE (BYPASSES 404 ERRORS) ---
 def get_gdrive():
     creds = Credentials.from_service_account_info(json.loads(GDRIVE_JSON))
     return build('drive', 'v3', credentials=creds)
@@ -34,15 +30,14 @@ def get_gdrive():
 def sync_drive():
     try:
         service = get_gdrive()
-        # Search for the file by name anywhere the service account has access
         query = f"name='{FILE_NAME}' and trashed = false"
         res = service.files().list(q=query, fields="files(id, name)").execute()
         files = res.get('files', [])
         
         if not files:
-            print(f"⚠️ {FILE_NAME} not found. Creating a fresh one...")
+            print("⚠️ File not found. Creating a new one...")
             meta = {'name': FILE_NAME, 'parents': [FOLDER_ID]}
-            media = MediaFileUpload(io.BytesIO(b""), mimetype='text/plain')
+            media = MediaIoBaseUpload(io.BytesIO(b""), mimetype='text/plain', resumable=True)
             f = service.files().create(body=meta, media_body=media, fields='id').execute()
             return f['id'], []
             
@@ -61,16 +56,18 @@ def sync_drive():
         print(f"📦 Loaded {len(history)} previous URLs.")
         return fid, history
     except Exception as e:
-        print(f"❌ DRIVE ERROR: {e}")
+        print(f"❌ DRIVE SYNC ERROR: {e}")
         return None, []
 
 def update_drive(fid, urls):
     if not fid: return
     try:
         service = get_gdrive()
-        # Keep history at 1000 items for speed
+        # Ensure only unique URLs, keep last 1000 for efficiency
         content = "\n".join(list(dict.fromkeys(urls))[-1000:])
-        media = MediaFileUpload(io.BytesIO(content.encode('utf-8')), mimetype='text/plain')
+        
+        # Use MediaIoBaseUpload instead of MediaFileUpload to fix the BytesIO error
+        media = MediaIoBaseUpload(io.BytesIO(content.encode('utf-8')), mimetype='text/plain', resumable=True)
         service.files().update(fileId=fid, media_body=media).execute()
         print("💾 History saved to Drive.")
     except Exception as e:
@@ -95,7 +92,6 @@ async def scrape(session, target, history_set):
                 if not link.startswith('http'):
                     link = f"https://{target['url'].split('/')[2]}/{link.lstrip('/')}"
                 
-                # Deduplication logic
                 if link in history_set: continue
                 
                 title = h.get_text().strip()
@@ -112,7 +108,6 @@ async def scrape(session, target, history_set):
                 return {"title": title, "url": link, "source": target['name'], "image": img}
     except: return None
 
-# --- MAIN ENGINE ---
 async def main():
     fid, history = sync_drive()
     history_set = set(history)
@@ -123,10 +118,8 @@ async def main():
         {"url": "https://www.bloomberg.com/world", "tag": "h2", "name": "Bloomberg"},
         {"url": "https://www.bbc.com/news/world", "tag": "h2", "name": "BBC News"},
         {"url": "https://www.dw.com/en/world/s-1429", "tag": "h2", "name": "DW News"},
-        {"url": "https://www.aljazeera.com/news/", "tag": "h3", "name": "Al Jazeera"},
         {"url": "https://www.thehindu.com/news/national/", "tag": "h3", "name": "The Hindu"},
-        {"url": "https://www.ndtv.com/india", "tag": "h2", "name": "NDTV"},
-        {"url": "https://techcrunch.com/", "tag": "h2", "name": "TechCrunch"}
+        {"url": "https://www.ndtv.com/india", "tag": "h2", "name": "NDTV"}
     ]
 
     bot = Bot(token=TG_TOKEN)
@@ -141,7 +134,6 @@ async def main():
         for art in fresh:
             if art['url'] in history_set: continue
             
-            # Post Construction with Linked Post CTA
             msg = (
                 f"🚨 **BREAKING NEWS**\n\n"
                 f"📰 **{art['title'].upper()}**\n\n"
