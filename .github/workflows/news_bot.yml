@@ -1,46 +1,35 @@
-name: News Bot 24/7 Pulse
+name: Automated News Bot
 
 on:
-  # Internal GitHub Timer (Backup)
   schedule:
-    - cron: '*/15 * * * *' 
-  
-  # Allows Manual "Run Workflow" button in GitHub Actions tab
-  workflow_dispatch:
-
-  # Allows cron-job.org to trigger the bot via API
-  repository_dispatch:
-    types: [run-bot]
+    # Runs every 6 hours (UTC)
+    - cron: '0 */6 * * *'
+  workflow_dispatch: # Allows manual trigger from the GitHub UI
 
 jobs:
-  run-bot:
+  build:
     runs-on: ubuntu-latest
-    
-    # Prevents multiple instances from running at the exact same time
-    concurrency:
-      group: news-bot-sync
-      cancel-in-progress: false
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Python 3.11
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          cache: 'pip' # Speeds up subsequent runs
+          python-version: '3.10'
+          cache: 'pip'
 
       - name: Install Dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install aiohttp beautifulsoup4 python-telegram-bot google-api-python-client google-auth-httplib2 google-auth-oauthlib
+          pip install pillow aiogram instagrapi
+          # Add any other dependencies from your requirements.txt
 
-      - name: Execute News Scraper
+      - name: Run News Bot
         env:
-          # These must match the names in your GitHub Secrets exactly
-          TG_TOKEN: ${{ secrets.TG_TOKEN }}
-          CH_ID: ${{ secrets.CH_ID }}
-          LINKVERTISE_ID: ${{ secrets.LINKVERTISE_ID }}
-          GDRIVE_JSON: ${{ secrets.GDRIVE_JSON }}
-        run: python app.py
+          # Map your GitHub Secrets to Environment Variables
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          INSTA_USERNAME: ${{ secrets.INSTA_USERNAME }}
+          INSTA_PASSWORD: ${{ secrets.INSTA_PASSWORD }}
+        run: python main.py # Ensure this matches your main script name
