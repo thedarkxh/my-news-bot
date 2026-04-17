@@ -1,35 +1,46 @@
-name: Automated News Bot
+name: News Bot 24/7 Pulse
 
 on:
+  # Internal GitHub Timer (Backup)
   schedule:
-    # Runs every 6 hours (UTC)
-    - cron: '0 */6 * * *'
-  workflow_dispatch: # Allows manual trigger from the GitHub UI
+    - cron: '*/15 * * * *' 
+  
+  # Allows Manual "Run Workflow" button in GitHub Actions tab
+  workflow_dispatch:
+
+  # Allows cron-job.org to trigger the bot via API
+  repository_dispatch:
+    types: [run-bot]
 
 jobs:
-  build:
+  run-bot:
     runs-on: ubuntu-latest
+    
+    # Prevents multiple instances from running at the exact same time
+    concurrency:
+      group: news-bot-sync
+      cancel-in-progress: false
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
-          cache: 'pip'
+          python-version: '3.11'
+          cache: 'pip' # Speeds up subsequent runs
 
       - name: Install Dependencies
         run: |
-          pip install pillow aiogram instagrapi
-          # Add any other dependencies from your requirements.txt
+          python -m pip install --upgrade pip
+          pip install aiohttp beautifulsoup4 python-telegram-bot google-api-python-client google-auth-httplib2 google-auth-oauthlib
 
-      - name: Run News Bot
+      - name: Execute News Scraper
         env:
-          # Map your GitHub Secrets to Environment Variables
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          INSTA_USERNAME: ${{ secrets.INSTA_USERNAME }}
-          INSTA_PASSWORD: ${{ secrets.INSTA_PASSWORD }}
-        run: python main.py # Ensure this matches your main script name
+          # These must match the names in your GitHub Secrets exactly
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          CH_ID: ${{ secrets.CH_ID }}
+          LINKVERTISE_ID: ${{ secrets.LINKVERTISE_ID }}
+          GDRIVE_JSON: ${{ secrets.GDRIVE_JSON }}
+        run: python app.py
