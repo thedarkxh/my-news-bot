@@ -128,7 +128,6 @@ async def main():
         {"url": "https://www.bloomberg.com/world", "tag": "h2", "name": "Bloomberg"},
         {"url": "https://www.bbc.com/news/world", "tag": "h2", "name": "BBC News"},
         {"url": "https://www.dw.com/en/world/s-1429", "tag": "h2", "name": "DW News"},
-        {"url": "https://www.aljazeera.com/news/", "tag": "h3", "name": "Al Jazeera"},
         {"url": "https://www.thehindu.com/news/national/", "tag": "h3", "name": "The Hindu"},
         {"url": "https://www.ndtv.com/india", "tag": "h2", "name": "NDTV"},
         {"url": "https://techcrunch.com/", "tag": "h2", "name": "TechCrunch"}
