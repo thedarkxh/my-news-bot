@@ -122,16 +122,71 @@ async def main():
     fid, history = sync_drive()
     history_set = set(history) # Faster lookup for large lists
     
-    SCRAPE_TARGETS = [
-        {"url": "https://www.reuters.com/world/", "tag": "h3", "name": "Reuters"},
-        {"url": "https://apnews.com/hub/world-news", "tag": "h3", "name": "AP News"},
-        {"url": "https://www.bloomberg.com/world", "tag": "h2", "name": "Bloomberg"},
-        {"url": "https://www.bbc.com/news/world", "tag": "h2", "name": "BBC News"},
-        {"url": "https://www.dw.com/en/world/s-1429", "tag": "h2", "name": "DW News"},
-        {"url": "https://www.thehindu.com/news/national/", "tag": "h3", "name": "The Hindu"},
-        {"url": "https://www.ndtv.com/india", "tag": "h2", "name": "NDTV"},
-        {"url": "https://techcrunch.com/", "tag": "h2", "name": "TechCrunch"}
-    ]
+SCRAPE_TARGETS = [
+    {"url": "https://reuters.com", "tag": "h3", "name": "Reuters"},
+    {"url": "https://apnews.com", "tag": "h3", "name": "AP News"},
+    {"url": "https://bloomberg.com", "tag": "h2", "name": "Bloomberg"},
+    {"url": "https://bbc.com", "tag": "h2", "name": "BBC News"},
+    {"url": "https://dw.com", "tag": "h2", "name": "DW News"},
+    {"url": "https://thehindu.com", "tag": "h3", "name": "The Hindu"},
+    {"url": "https://ndtv.com", "tag": "h2", "name": "NDTV"},
+    {"url": "https://techcrunch.com", "tag": "h2", "name": "TechCrunch"},
+    {"url": "https://nhk.or.jp", "tag": "span", "name": "NHK World-Japan"},
+    {"url": "https://japantimes.co.jp", "tag": "h3", "name": "The Japan Times"},
+    {"url": "https://scmp.com", "tag": "h2", "name": "South China Morning Post"},
+    {"url": "https://news.cn", "tag": "h3", "name": "Xinhua News"},
+    {"url": "https://caixinglobal.com", "tag": "h3", "name": "Caixin Global"},
+    {"url": "https://meduza.io", "tag": "h3", "name": "Meduza"},
+    {"url": "https://themoscowtimes.com", "tag": "h2", "name": "The Moscow Times"},
+    {"url": "https://tass.com", "tag": "h3", "name": "TASS News Agency"},
+    {"url": "https://tagesschau.de", "tag": "span", "name": "Tagesschau"},
+    {"url": "https://spiegel.de", "tag": "h2", "name": "Der Spiegel (International)"},
+    {"url": "https://sueddeutsche.de", "tag": "h3", "name": "Süddeutsche Zeitung"},
+    {"url": "https://nytimes.com", "tag": "h3", "name": "The New York Times"},
+    {"url": "https://washingtonpost.com", "tag": "h2", "name": "The Washington Post"},
+    {"url": "https://wsj.com", "tag": "h3", "name": "The Wall Street Journal"},
+    {"url": "https://abc.net.au", "tag": "h2", "name": "ABC News (Australia)"},
+    {"url": "https://smh.com.au", "tag": "h3", "name": "The Sydney Morning Herald"},
+    {"url": "https://theaustralian.com.au", "tag": "h3", "name": "The Australian"},
+    {"url": "https://theguardian.com", "tag": "h3", "name": "The Guardian"},
+    {"url": "https://thetimes.com", "tag": "h3", "name": "The Times"},
+    {"url": "https://cbc.ca", "tag": "h3", "name": "CBC News"},
+    {"url": "https://theglobeandmail.com", "tag": "h3", "name": "The Globe and Mail"},
+    {"url": "https://nationalpost.com", "tag": "h2", "name": "National Post"},
+    {"url": "https://swissinfo.ch", "tag": "h2", "name": "SWI swissinfo.ch"},
+    {"url": "https://nzz.ch", "tag": "h2", "name": "Neue Zürcher Zeitung"},
+    {"url": "https://letemps.ch", "tag": "h3", "name": "Le Temps"},
+    {"url": "https://mainichi.jp", "tag": "h3", "name": "The Mainichi"},
+    {"url": "https://nikkei.com", "tag": "h2", "name": "Nikkei Asia"},
+    {"url": "https://asahi.com", "tag": "h3", "name": "The Asahi Shimbun (AJW)"},
+    # --- 20 NEW RECOMMENDATIONS ---
+    # Global & Pan-Regional Powers
+    {"url": "https://france24.com", "tag": "h2", "name": "France 24 (English)"},
+    {"url": "https://lemonde.fr", "tag": "h3", "name": "Le Monde (English)"},
+    {"url": "https://aljazeera.com", "tag": "h2", "name": "Al Jazeera English"},
+    {"url": "https://haaretz.com", "tag": "h2", "name": "Haaretz (Israel)"},
+    # Northern & Southern Europe
+    {"url": "https://elpais.com", "tag": "h2", "name": "El País (Spain)"},
+    {"url": "https://corriere.it", "tag": "h3", "name": "Corriere della Sera (Italy)"},
+    {"url": "https://thejournal.ie", "tag": "h2", "name": "TheJournal.ie (Ireland)"},
+    {"url": "https://yle.fi", "tag": "h3", "name": "YLE News (Finland)"},
+    {"url": "https://thelocal.se", "tag": "h2", "name": "The Local Sweden"},
+    # Latin America
+    {"url": "https://elpais.com", "tag": "h2", "name": "El País Américas"},
+    {"url": "https://infobae.com", "tag": "h2", "name": "Infobae (Latin America)"},
+    {"url": "https://globo.com", "tag": "h2", "name": "G1 Globo (Brazil)"},
+    # Africa
+    {"url": "https://news24.com", "tag": "h3", "name": "News24 (South Africa)"},
+    {"url": "https://theeastafrican.co.ke", "tag": "h2", "name": "The EastAfrican"},
+    {"url": "https://punchng.com", "tag": "h3", "name": "The Punch (Nigeria)"},
+    # Asia-Pacific Extensions
+    {"url": "https://straitstimes.com", "tag": "h3", "name": "The Straits Times (Singapore)"},
+    {"url": "https://channelnewsasia.com", "tag": "h2", "name": "CNA (Channel NewsAsia)"},
+    {"url": "https://rnz.co.nz", "tag": "h2", "name": "RNZ (Radio New Zealand)"},
+    {"url": "https://koreatimes.co.kr", "tag": "h2", "name": "The Korea Times"},
+    {"url": "https://thestar.com.my", "tag": "h2", "name": "The Star (Malaysia)"}
+]
+
 
     bot = Bot(token=TG_TOKEN)
     async with aiohttp.ClientSession() as session:
