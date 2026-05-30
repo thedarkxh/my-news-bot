@@ -11,6 +11,7 @@ from telegram.constants import ParseMode
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
+from deep_translator import GoogleTranslator
 
 # --- CONFIG & SECRETS ---
 TG_TOKEN = os.getenv("TG_TOKEN")
@@ -104,6 +105,12 @@ async def scrape(session, target, history_set):
                 
                 title = h.get_text().strip()
                 if len(title) < 40: continue
+                
+                # Auto-Translate to English
+                try:
+                    title = await asyncio.to_thread(GoogleTranslator(source='auto', target='en').translate, title)
+                except Exception as e:
+                    print(f"⚠️ Translation failed: {e}")
                 
                 img = None
                 try:
