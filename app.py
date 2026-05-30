@@ -122,7 +122,7 @@ async def main():
     fid, history = sync_drive()
     history_set = set(history) # Faster lookup for large lists
     
-SCRAPE_TARGETS = [
+    SCRAPE_TARGETS = [
     {"url": "https://reuters.com", "tag": "h3", "name": "Reuters"},
     {"url": "https://apnews.com", "tag": "h3", "name": "AP News"},
     {"url": "https://bloomberg.com", "tag": "h2", "name": "Bloomberg"},
@@ -185,7 +185,7 @@ SCRAPE_TARGETS = [
     {"url": "https://rnz.co.nz", "tag": "h2", "name": "RNZ (Radio New Zealand)"},
     {"url": "https://koreatimes.co.kr", "tag": "h2", "name": "The Korea Times"},
     {"url": "https://thestar.com.my", "tag": "h2", "name": "The Star (Malaysia)"}
-]
+    ]
 
 
     bot = Bot(token=TG_TOKEN)
