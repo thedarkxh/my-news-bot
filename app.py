@@ -173,7 +173,6 @@ async def main():
     {"url": "https://aljazeera.com", "tag": "h2", "name": "Al Jazeera English"},
     {"url": "https://haaretz.com", "tag": "h2", "name": "Haaretz (Israel)"},
     # Northern & Southern Europe
-    {"url": "https://elpais.com", "tag": "h2", "name": "El País (Spain)"},
     {"url": "https://corriere.it", "tag": "h3", "name": "Corriere della Sera (Italy)"},
     {"url": "https://thejournal.ie", "tag": "h2", "name": "TheJournal.ie (Ireland)"},
     {"url": "https://yle.fi", "tag": "h3", "name": "YLE News (Finland)"},
