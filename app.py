@@ -174,7 +174,6 @@ async def main():
     # Northern & Southern Europe
     {"url": "https://corriere.it", "tag": "h3", "name": "Corriere della Sera (Italy)"},
     {"url": "https://thejournal.ie", "tag": "h2", "name": "TheJournal.ie (Ireland)"},
-    {"url": "https://yle.fi", "tag": "h3", "name": "YLE News (Finland)"},
     {"url": "https://thelocal.se", "tag": "h2", "name": "The Local Sweden"},
     # Latin America
     {"url": "https://elpais.com", "tag": "h2", "name": "El País Américas"},
@@ -183,7 +182,6 @@ async def main():
     # Africa
     {"url": "https://news24.com", "tag": "h3", "name": "News24 (South Africa)"},
     {"url": "https://theeastafrican.co.ke", "tag": "h2", "name": "The EastAfrican"},
-    {"url": "https://punchng.com", "tag": "h3", "name": "The Punch (Nigeria)"},
     # Asia-Pacific Extensions
     {"url": "https://straitstimes.com", "tag": "h3", "name": "The Straits Times (Singapore)"},
     {"url": "https://channelnewsasia.com", "tag": "h2", "name": "CNA (Channel NewsAsia)"},
