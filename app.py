@@ -131,7 +131,6 @@ async def main():
     
     SCRAPE_TARGETS = [
     {"url": "https://reuters.com", "tag": "h3", "name": "Reuters"},
-    {"url": "https://apnews.com", "tag": "h3", "name": "AP News"},
     {"url": "https://bloomberg.com", "tag": "h2", "name": "Bloomberg"},
     {"url": "https://bbc.com", "tag": "h2", "name": "BBC News"},
     {"url": "https://dw.com", "tag": "h2", "name": "DW News"},
